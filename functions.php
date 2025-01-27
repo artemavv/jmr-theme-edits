@@ -62,87 +62,80 @@ function wc_modify_product_post_type( $args ) {
 /**
  * Register a shortcode that creates a product categories dropdown list
  *
- * Use: [product_categories_dropdown orderby="title" show_count="1" fade_to_white="1" ]
+ * Use: [product_categories_dropdown orderby="title" show_count="1" remove_past_categories="1" prefix="Ending" ]
  * 
  * Set "show_count" to 0 if you want to hide item counts.
- * Set "fade_to_white" to 0 if you do not want site page fade to white while loading the selected category page.
+ * Set "remove_past_categories" to 0 if you do not want remove "past" categories
  *
 */ 
 add_shortcode( 'product_categories_dropdown', 'woo_product_categories_dropdown' );
 
 function woo_product_categories_dropdown( $atts ) {
 
+	$atts = shortcode_atts( array(
+		'show_count'               => 1,
+		'remove_past_categories'   => 1,
+		'prefix'                   => 'Ending'
+	), $atts, 'product_categories_dropdown' );
+	
+	
+	if ( $atts['remove_past_categories'] != 0 ) {
+		
+		$exclude_ids = woo_get_past_categories_ids( $atts['prefix'], date('j'), date('n'), date('y') );
+		
+		if ( is_array( $atts) ) {
+			$atts['exclude'] = $exclude_ids;
+		}
+	}
+
 	ob_start();
 	
-    wc_product_dropdown_categories( $atts );
- 
-	if ( isset($atts['fade_to_white']) && $atts['fade_to_white'] == 0 ) {
-		$fade_to_white = 0;
-	}
-	else {
-		$fade_to_white = 1;
-	}
-	
-	?>
-	<style>
-
-		.cover-everything {
-				position: fixed;
-				top: 0;
-				right: 0;
-				bottom: 0;
-				left: 0;
-				background-color: #ffffff;
-				z-index: 10000;
-		}
-
-		.fade-in-slowly {
-			animation-name: fade-in-slowly;
-			animation-duration: 2s;
-			animation-iteration-count: 1;
-		}
-
-		@keyframes fade-in-slowly {
-			from {
-				opacity: 0;
-			}
-
-			to {
-				opacity: 1;
-			}
-		}
-	</style>
-	
-	<?php if ( $fade_to_white ): ?>
-		<div id="jimaroos-modal-loader-popup" class="cover-everything" style="display: none;"></div>
-	<?php endif; ?>
-		
-	<script type='text/javascript'>
-	/* <![CDATA[ */
-		var product_cat_dropdown = document.getElementById("product_cat");
-		var loader_popup = document.getElementById("jimaroos-modal-loader-popup");
-		
-		if ( product_cat_dropdown ) {
-			function onProductCatChange() {
-				if ( product_cat_dropdown.options[product_cat_dropdown.selectedIndex].value !=='' ) {
-
-					location.href = "<?php echo home_url(); ?>/?product_cat="+product_cat_dropdown.options[product_cat_dropdown.selectedIndex].value;
-
-					if ( loader_popup ) {
-						loader_popup.className += " fade-in-slowly";
-						loader_popup.style.display = "block";
-					}
-
-				}
-			}
-			product_cat_dropdown.onchange = onProductCatChange;
-		}
-	/* ]]> */
-	</script>
-	<?php
+	wc_product_dropdown_categories( $atts );
 	
 	return ob_get_clean();
 	
+}
+
+/**
+ * Finds all categories whose names match "Ending XX/XX/XX" 
+ * and XX/XX/XX is the date earlier than the specified date
+ *
+ * @return array
+ */
+function woo_get_past_categories_ids( $prefix = 'Ending', $day = 31, $month = 12, $year = 24 ) {
+	$ids = array();
+	
+	$pattern = '#' . $prefix . '.+([0-9]{2})/([0-9]{2})/([0-9]{2})#';
+  
+	$args = array(
+			'hide_empty'         => 1,
+			'show_uncategorized' => 1,
+			'value_field'        => 'slug',
+			'taxonomy'           => 'product_cat',
+	);
+	
+	$product_categories = get_terms( $args );
+					
+	foreach ( $product_categories as $category ) {
+		
+		$match = [];
+		
+		if ( preg_match_all( $pattern, $category->name, $match ) ) {
+			
+			$cat_month = intval($match[1][0]);
+			$cat_day   = intval($match[2][0]);
+			$cat_year  = intval($match[3][0]);
+			
+			$cat_date = date( 'U', mktime( 0, 0, 0, $cat_month, $cat_day, 2000 + $cat_year) );
+			$date     = date( 'U', mktime( 0, 0, 0, $month, $day, 2000 + $year) );
+			
+			if ( $cat_date <= $date ) {
+				$ids[] = $category->term_id;
+			}
+		}
+	}
+	
+	return $ids;
 }
 
 /**-----------------------------------------------------------------------*/
