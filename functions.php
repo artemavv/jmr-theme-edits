@@ -75,16 +75,18 @@ function woo_product_categories_dropdown( $atts ) {
 	$atts = shortcode_atts( array(
 		'show_count'               => 1,
 		'remove_past_categories'   => 1,
-		'prefix'                   => 'Ending'
+		'ending_sign'              => 'Ending',
+		'starting_sign'            => 'Starting'
 	), $atts, 'product_categories_dropdown' );
 	
 	
 	if ( $atts['remove_past_categories'] != 0 ) {
 		
-		$exclude_ids = woo_get_past_categories_ids( $atts['prefix'], date('j'), date('n'), date('y') );
+		$exclude_past_ids = woo_get_past_categories_ids( $atts['ending_sign'] );
+		$exclude_future_ids = woo_get_future_categories_ids( $atts['starting_sign'] );
 		
-		if ( is_array( $atts) ) {
-			$atts['exclude'] = $exclude_ids;
+		if ( is_array($atts) ) {
+			$atts['exclude'] = array_merge( $exclude_future_ids, $exclude_past_ids );
 		}
 	}
 
@@ -100,10 +102,16 @@ function woo_product_categories_dropdown( $atts ) {
  * Finds all categories whose names match "Ending XX/XX/XX" 
  * and XX/XX/XX is the date earlier than the specified date
  *
+ * @prefix string set to use specific starting word
+ * 
  * @return array
  */
-function woo_get_past_categories_ids( $prefix = 'Ending', $day = 31, $month = 12, $year = 24 ) {
+function woo_get_past_categories_ids( $prefix = 'Ending' ) {
 	$ids = array();
+	
+	$day = date('j');
+	$month = date('n');
+	$year = date('y');
 	
 	$pattern = '#' . $prefix . '.+([0-9]{2})/([0-9]{2})/([0-9]{2})#';
   
@@ -137,6 +145,61 @@ function woo_get_past_categories_ids( $prefix = 'Ending', $day = 31, $month = 12
 	
 	return $ids;
 }
+
+
+/**
+ * Finds all categories whose descriptions match "Starting XX/XX/XX HH:MM" 
+ * and XX/XX/XX HH:MM is the date which is past the specified date and time
+ *
+ * @prefix string set to use specific starting word
+ * 
+ * @return array
+ */
+function woo_get_future_categories_ids( $prefix = 'Starting' ) {
+	$ids = array();
+	
+	
+	$day   = date('j');
+	$month = date('n');
+	$year  = date('y');
+	$hour  = date('G');
+	$minutes  = date('i');
+	
+	$pattern = '#' . $prefix . '.+([0-9]{2})/([0-9]{2})/([0-9]{2}).+([0-9]{2}):([0-9]{2})#';
+  
+	$args = array(
+			'hide_empty'         => 1,
+			'show_uncategorized' => 1,
+			'value_field'        => 'slug',
+			'taxonomy'           => 'product_cat',
+	);
+	
+	$product_categories = get_terms( $args );
+					
+	foreach ( $product_categories as $category ) {
+		
+		$match = [];
+		
+		if ( preg_match_all( $pattern, $category->description, $match ) ) {
+			
+			$cat_month    = intval($match[1][0]);
+			$cat_day      = intval($match[2][0]);
+			$cat_year     = intval($match[3][0]);
+			$cat_hour     = intval($match[4][0]);
+			$cat_minutes  = intval($match[5][0]);
+			
+			$cat_date = date( 'U', mktime( $cat_hour, $cat_minutes, 0, $cat_month, $cat_day, 2000 + $cat_year) );
+			$date     = date( 'U', mktime( $hour, $minutes, 0, $month, $day, 2000 + $year) );
+			
+			if ( $cat_date >= $date ) { // this category has not yet started
+				$ids[] = $category->term_id;
+			}
+		}
+	}
+	
+	return $ids;
+}
+
 
 /**-----------------------------------------------------------------------*/
 
