@@ -85,12 +85,22 @@ function woo_product_categories_dropdown( $atts ) {
 		$exclude_past_ids = woo_get_past_categories_ids( $atts['ending_sign'] );
 		$exclude_future_ids = woo_get_future_categories_ids( $atts['starting_sign'] );
 		
+		if ( isset( $_GET['debug-jimaroos'] ) ) {
+			echo('<pre>' . print_r( $exclude_past_ids , 1 ) . '</pre>' );
+			echo('<pre>' . print_r( $exclude_future_ids , 1 ) . '</pre>' );
+		}
+		
 		if ( is_array($atts) ) {
 			$atts['exclude'] = array_merge( $exclude_future_ids, $exclude_past_ids );
 		}
 	}
 
 	ob_start();
+	
+	
+	if ( isset( $_GET['debug-jimaroos'] ) ) {
+		echo( date('Y-m-d H:i:s') );
+	}
 	
 	wc_product_dropdown_categories( $atts );
 	
@@ -137,7 +147,13 @@ function woo_get_past_categories_ids( $prefix = 'Ending' ) {
 			$cat_date = date( 'U', mktime( 0, 0, 0, $cat_month, $cat_day, 2000 + $cat_year) );
 			$date     = date( 'U', mktime( 0, 0, 0, $month, $day, 2000 + $year) );
 			
-			if ( $cat_date <= $date ) {
+			$timezone_offset = -7 * 3600; // UTC-7;
+			
+			if ( $cat_date <= $date + $timezone_offset ) {
+				
+				if ( isset( $_GET['debug-jimaroos'] ) ) {
+					echo( date('Y-m-d H:i:s' , $date ) );
+				}
 				$ids[] = $category->term_id;
 			}
 		}
@@ -191,7 +207,9 @@ function woo_get_future_categories_ids( $prefix = 'Starting' ) {
 			$cat_date = date( 'U', mktime( $cat_hour, $cat_minutes, 0, $cat_month, $cat_day, 2000 + $cat_year) );
 			$date     = date( 'U', mktime( $hour, $minutes, 0, $month, $day, 2000 + $year) );
 			
-			if ( $cat_date >= $date ) { // this category has not yet started
+			$timezone_offset = -7 * 3600; // UTC-7;
+			
+			if ( $cat_date >= $date + $timezone_offset ) { // this category has not yet started
 				$ids[] = $category->term_id;
 			}
 		}
